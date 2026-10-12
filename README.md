@@ -161,16 +161,6 @@ SerialAssistant/
 
 ---
 
-## 已知限制与待办
-
-- **退出未清理**：`MainViewModel.Dispose()` 目前无调用方，程序退出时串口与日志未显式释放，可在 `MainWindow.Closing` 中挂接。
-- **写超时处理**：`Write` 超时（默认 2000ms）目前仅提示发送失败并停止定时发送，后续建议按「设备异常」走强制断开流程。
-- **发送静默成功**：`SerialPortService.Send` 在端口未打开时返回 `0` 而不抛异常，调用方无法区分「发送成功」与「未发送」。
-- **编码范围**：`HexUtil` 的 ASCII 转换仅覆盖可打印 ASCII（0x20~0x7E），0x80 以上会变成 `?`，暂不支持中文与多字节编码。
-- **快捷指令未持久化**：快捷指令与参数预设为运行时内存数据，重启后恢复默认。
-
----
-
 ## 许可
 
 本项目基于 [MIT License](LICENSE.txt) 开源，Copyright (c) 2026 lguangdong。
