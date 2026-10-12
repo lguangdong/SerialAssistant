@@ -1,0 +1,51 @@
+name: 发布
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    # WPF 无法在 Linux 构建器上编译，必须使用 Windows
+    runs-on: windows-latest
+
+    # 创建 Release 需要仓库写权限
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 发布自包含单文件
+        # IncludeNativeLibrariesForSelfExtract 必须显式打开，
+        # 否则 WPF 的 5 个原生 dll 会留在 exe 外面
+        run: >
+          dotnet publish SerialAssistant/SerialAssistant.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=none
+          -o ./artifacts
+
+      - name: 校验产物
+        shell: pwsh
+        run: |
+          Get-ChildItem ./artifacts | Select-Object Name, @{N='SizeMB';E={[math]::Round($_.Length/1MB,2)}} | Format-Table -AutoSize
+          if (-not (Test-Path ./artifacts/SerialAssistant.exe)) { throw "未生成 SerialAssistant.exe" }
+
+      - name: 创建 Release 并上传
+        uses: softprops/action-gh-release@v2
+        with:
+          name: SerialAssistant ${{ github.ref_name }}
+          files: ./artifacts/SerialAssistant.exe
+          generate_release_notes: true
+          draft: false
