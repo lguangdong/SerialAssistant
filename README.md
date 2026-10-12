@@ -173,4 +173,4 @@ SerialAssistant/
 
 ## 许可
 
-本项目仅用于学习与调试用途。
+本项目基于 [MIT License](LICENSE.txt) 开源，Copyright (c) 2026 lguangdong。
