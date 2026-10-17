@@ -52,7 +52,7 @@ namespace SerialAssistant.ViewModels
         // ==================== 常量 ====================
         private const int UiRefreshIntervalMs = 50;       // UI 批量刷新间隔（20fps）
         private const int MaxBytesPerTick = 64 * 1024;    // 单次消费上限（背压保护）
-        private const int MaxDisplayChars = 256 * 1024;   // 显示区字符上限（防内存无限增长）
+        private const int MaxDisplayChars = 64 * 1024;   // 显示区字符上限（防内存无限增长）
         private const int MinSendIntervalMs = 10;         // 定时发送最小间隔
 
         // ==================== 依赖 ====================
@@ -169,8 +169,8 @@ namespace SerialAssistant.ViewModels
 
         // ==================== 接收显示 ====================
 
-        [ObservableProperty]
-        private string _displayText = string.Empty;
+        public event Action<string>? DisplayAppend;
+        public event Action<string>? DisplayReplace;
 
         [ObservableProperty]
         private bool _isDisplayHex;
@@ -262,7 +262,7 @@ namespace SerialAssistant.ViewModels
         private void ClearDisplay()
         {
             _display.Clear();
-            DisplayText = string.Empty;
+            DisplayReplace?.Invoke(string.Empty);
             RxCount = 0;
         }
 
@@ -553,8 +553,8 @@ namespace SerialAssistant.ViewModels
 
             string body = IsDisplayHex ? HexUtil.ToHex(payload) : HexUtil.ToAscii(payload);
             string line = ShowTimestamp
-                ? $"[{DateTime.Now:HH:mm:ss.fff}] {body}"
-                : body;
+                ? $"[{DateTime.Now:HH:mm:ss.fff}] {body}{Environment.NewLine}"
+                : body+Environment.NewLine;
 
             AppendToDisplay(line);
 
@@ -562,21 +562,18 @@ namespace SerialAssistant.ViewModels
                 _logger.Write($"<- {body}");
         }
 
-        private void AppendToDisplay(string text)
+        private void AppendToDisplay(string line)
         {
-            _display.Append(text);
-            _display.Append(Environment.NewLine);   // 每批数据一行
+            _display.Append(line);
 
             if (_display.Length > MaxDisplayChars)
             {
                 // 超出上限 → 只保留尾部，整体替换一次
                 _display.Remove(0, _display.Length - MaxDisplayChars);
-                DisplayText = _display.ToString();
+                DisplayReplace?.Invoke(_display.ToString());
+                return;
             }
-            else
-            {
-                DisplayText = _display.ToString();
-            }
+            DisplayAppend?.Invoke(line);
         }
 
         // ====================================================================

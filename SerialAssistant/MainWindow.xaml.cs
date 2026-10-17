@@ -22,6 +22,8 @@ namespace SerialAssistant
         {
             InitializeComponent();
             DataContext = _vm;
+            _vm.DisplayAppend += OnDisplayAppend;
+            _vm.DisplayReplace += OnDisplayReplace;
             // 这个页面内容较多，进入时适当放大窗口
             if (Window.GetWindow(this) is Window window)
             {
@@ -29,6 +31,9 @@ namespace SerialAssistant
                 if (window.Height < 640) window.Height = 760;
             }
         }
+
+        private void OnDisplayAppend(string line) => ReceiveBox.AppendText(line);
+        private void OnDisplayReplace(string text) => ReceiveBox.Text = text;
 
         /// <summary>接收区自动滚动到底部</summary>
         private void OnReceiveTextChanged(object sender, TextChangedEventArgs e)
@@ -42,6 +47,14 @@ namespace SerialAssistant
         {
             if (QuickList.SelectedItem is string command)
                 _vm.SendQuickCommandCommand.Execute(command);
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            _vm.DisplayAppend -= OnDisplayAppend;
+            _vm.DisplayReplace -= OnDisplayReplace;
+            _vm.Dispose();
+            base.OnClosed(e);
         }
     }
 }

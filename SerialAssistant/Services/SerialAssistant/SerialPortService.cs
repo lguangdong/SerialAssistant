@@ -17,13 +17,14 @@ namespace SerialAssistant.Services.SerialAssistant
         private readonly object _lock = new object();
         public bool IsOpen => _port?.IsOpen == true;
 
-        public event Action<byte[]>? DataReceived = null;
-        public event Action<string>? ErrorOccurred = null;
+        public event Action<byte[]>? DataReceived;
+        public event Action<string>? ErrorOccurred;
 
         public void Open(SerialSetting s)
         {
             if (IsOpen) return;
-            _port = new SerialPort(s.PortName, s.BaudRate, s.Parity, s.DataBits, s.StopBits)
+            ReleasePort();
+            var port = new SerialPort(s.PortName, s.BaudRate, s.Parity, s.DataBits, s.StopBits)
             {
                 Handshake = s.Handshake,
                 ReadTimeout = ReadTimeoutMs,
@@ -32,33 +33,34 @@ namespace SerialAssistant.Services.SerialAssistant
             };
             try
             {
-                _port.Open();
-                _port.DiscardInBuffer();
+                port.Open();
+                port.DiscardInBuffer();
             }
             catch (Exception ex)
             {
-
+                try { port.Dispose(); } catch { }
                 ErrorOccurred?.Invoke(ex.Message);
                 return;
             }
        
-
+            _port = port;
             _readLoopThread = new Thread(ReadLoop)
             {
                 IsBackground = true,
                 Name = "SerialPortService.ReadLoop",
             };
-            _readLoopThread.Start();
+            _readLoopThread.Start(port);
         }
 
-        private void ReadLoop()
+        private void ReadLoop(object? state)
         {
+            var port = (SerialPort)state!;
             var buffer = new byte[4096];
             while (true)
             {
                 try
                 {
-                    int n = _port!.Read(buffer, 0, buffer.Length);
+                    int n = port.Read(buffer, 0, buffer.Length);
                     if (n > 0)
                     {
                         DataReceived?.Invoke(buffer.AsSpan(0, n).ToArray());
@@ -85,25 +87,28 @@ namespace SerialAssistant.Services.SerialAssistant
 
         }
 
-        public void Close()
+        public void Close() => ReleasePort();
+
+        public void Dispose() => ReleasePort();
+
+        private void ReleasePort()
         {
+            SerialPort? port;
+            Thread? thread;
             lock (_lock)
             {
-                if (!IsOpen) return;
-                if (IsOpen) _port?.Close();
-                if (!_readLoopThread!.Join(ReadTimeoutMs + 100))
-                {
-                    //读线程未正常退出，需要想办法处理
-                    ErrorOccurred?.Invoke("读线程未正常退出");
-                }
+                port = _port;
+                thread = _readLoopThread;
+                _port = null;
                 _readLoopThread = null;
             }
-        }
-        public void Dispose()
-        {
-            Close();
-            _port?.Dispose();
-            _port = null;
+            if (port == null) return;
+            try { if (port.IsOpen) port.Close(); } catch { }
+
+            if (!thread!.Join(ReadTimeoutMs + 100))
+                ErrorOccurred?.Invoke("读线程未正常退出");
+
+            try { port.Dispose(); } catch { }
         }
     }
 }

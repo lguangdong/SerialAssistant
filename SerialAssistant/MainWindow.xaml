@@ -231,10 +231,10 @@
                     Background="#FFFBFCFD"
                     FontFamily="Consolas"
                     FontSize="13"
+                    HorizontalScrollBarVisibility="Auto"
                     IsReadOnly="True"
-                    Text="{Binding DisplayText, Mode=OneWay}"
                     TextChanged="OnReceiveTextChanged"
-                    TextWrapping="Wrap"
+                    TextWrapping="NoWrap"
                     VerticalScrollBarVisibility="Auto" />
             </DockPanel>
         </GroupBox>
