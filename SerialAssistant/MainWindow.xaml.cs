@@ -27,7 +27,7 @@ namespace SerialAssistant
             // 这个页面内容较多，进入时适当放大窗口
             if (Window.GetWindow(this) is Window window)
             {
-                if (window.Width < 1100) window.Width = 1180;
+                if (window.Width < 400) window.Width = 400;
                 if (window.Height < 640) window.Height = 760;
             }
         }

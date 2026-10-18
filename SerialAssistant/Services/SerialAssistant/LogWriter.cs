@@ -50,6 +50,11 @@ namespace SerialAssistant.Services.SerialAssistant
             }
         }
 
+        public void ManualFlush()
+        {
+            _writer?.Flush();
+        }
+
         public void Dispose()
         {
             Stop();

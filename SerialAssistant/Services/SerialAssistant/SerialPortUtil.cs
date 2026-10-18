@@ -15,19 +15,23 @@ namespace SerialAssistant.Services.SerialAssistant
             var list = new List<SerialPortInfo>();
             try
             {
-                var searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_PnPEntity WHERE Caption LIKE '%(COM%'");
-                var result = searcher.Get();
+                using var searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_PnPEntity WHERE Caption LIKE '%(COM%'");
+                using var result = searcher.Get();
                 foreach (var item in result)
                 {
-                    var caption = item["Caption"]?.ToString();
-                    if (string.IsNullOrEmpty(caption)) continue;
-                    int idx = caption.LastIndexOf("(COM");
-                    if (idx == -1) continue;
-                    int endIdx = caption.IndexOf(')', idx);
-                    if (endIdx == -1) continue;
-                    var com = caption.Substring(idx + 1, endIdx - idx - 1).Trim();
-                    var desc = caption[..idx].Trim();
-                    list.Add(new SerialPortInfo() { PortName = com, Description = desc });
+                    using (item)
+                    {
+                        var caption = item["Caption"]?.ToString();
+                        if (string.IsNullOrEmpty(caption)) continue;
+                        int idx = caption.LastIndexOf("(COM");
+                        if (idx == -1) continue;
+                        int endIdx = caption.IndexOf(')', idx);
+                        if (endIdx == -1) continue;
+                        var com = caption.Substring(idx + 1, endIdx - idx - 1).Trim();
+                        var desc = caption[..idx].Trim();
+                        list.Add(new SerialPortInfo() { PortName = com, Description = desc });
+                    }
+
                 }
             }
             catch (Exception)

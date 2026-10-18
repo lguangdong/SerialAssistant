@@ -66,6 +66,7 @@ namespace SerialAssistant.ViewModels
         private readonly DispatcherTimer _uiTimer;
         private bool _opening;
         private bool _suppressLogCallback;
+        private bool _refreshing;
 
         private CancellationTokenSource? _timeCts;
         private Task? _timeLoop;
@@ -77,7 +78,7 @@ namespace SerialAssistant.ViewModels
      
             LoadPresets();
             LoadDefaultQuickCommands();
-            RefreshPorts();
+            _ = RefreshPorts();
 
             _uiTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
@@ -216,20 +217,36 @@ namespace SerialAssistant.ViewModels
         // ====================================================================
 
         [RelayCommand]
-        private void RefreshPorts()
+        private async Task RefreshPorts()
         {
-            string? keep = SelectedPort?.PortName;
-            var latest = SerialPortUtil.GetPorts();
+            if (_refreshing) return;
+            _refreshing = true;
 
-            Ports.Clear();
-            foreach (var p in latest)
-                Ports.Add(p);
+           
+            try
+            {
+                string? keep = SelectedPort?.PortName;
+                var latest = await Task.Run(SerialPortUtil.GetPorts);
+                Ports.Clear();
+                foreach (var p in latest)
+                    Ports.Add(p);
 
-            // 刷新后尽量还原之前的选择，避免下拉框被清空
-            SelectedPort = FindPort(keep) ?? (Ports.Count > 0 ? Ports[0] : null);
+                // 刷新后尽量还原之前的选择，避免下拉框被清空
+                SelectedPort = FindPort(keep) ?? (Ports.Count > 0 ? Ports[0] : null);
 
-            if (Ports.Count == 0)
-                StatusMessage = "未检测到任何串口";
+                if (Ports.Count == 0)
+                    StatusMessage = "未检测到任何串口";
+            }
+            catch (Exception ex)
+            {
+
+                StatusMessage = "刷新串口失败：" + ex.Message;
+            }
+            finally
+            {
+                _refreshing = false;
+            }
+            
         }
 
         private SerialPortInfo? FindPort(string? portName)
@@ -246,7 +263,11 @@ namespace SerialAssistant.ViewModels
         [RelayCommand]
         private void ToggleOpen()
         {
-            if (IsConnected) ClosePort();
+            if (IsConnected)
+            {
+                ClosePort();
+                _logger.ManualFlush();
+            }
             else OpenPort();
         }
 
@@ -431,6 +452,11 @@ namespace SerialAssistant.ViewModels
             try
             {
                 await Task.Run(() =>  _serial.Send(payload));
+                string line = ShowTimestamp
+                ? $"[{DateTime.Now:HH:mm:ss.fff}] ==> {logBody}{Environment.NewLine}"
+                : logBody + Environment.NewLine;
+
+                AppendToDisplay(line);
             }
             catch (Exception ex)
             {
@@ -553,7 +579,7 @@ namespace SerialAssistant.ViewModels
 
             string body = IsDisplayHex ? HexUtil.ToHex(payload) : HexUtil.ToAscii(payload);
             string line = ShowTimestamp
-                ? $"[{DateTime.Now:HH:mm:ss.fff}] {body}{Environment.NewLine}"
+                ? $"[{DateTime.Now:HH:mm:ss.fff}] <== {body}{Environment.NewLine}"
                 : body+Environment.NewLine;
 
             AppendToDisplay(line);
