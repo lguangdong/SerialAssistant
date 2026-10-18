@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel.Design;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
 using System.Linq;
@@ -445,18 +446,20 @@ namespace SerialAssistant.ViewModels
                 });
                 return;
             }
-            StatusMessage = $"正在发送中。。。{text}";
+            
             int length = payload.Length;
             string logBody = isHex ? HexUtil.ToHex(payload) : HexUtil.ToAscii(payload);
+            bool stamp = ShowTimestamp;
+            StatusMessage = $"正在发送中。。。{text}";
 
             try
             {
                 await Task.Run(() =>  _serial.Send(payload));
-                string line = ShowTimestamp
+                string line = stamp
                 ? $"[{DateTime.Now:HH:mm:ss.fff}] ==> {logBody}{Environment.NewLine}"
                 : logBody + Environment.NewLine;
-
-                AppendToDisplay(line);
+                PostToUi(() => AppendToDisplay(line));
+        
             }
             catch (Exception ex)
             {
@@ -590,6 +593,7 @@ namespace SerialAssistant.ViewModels
 
         private void AppendToDisplay(string line)
         {
+            Debug.Assert(_ui.CheckAccess(), "AppendToDisplay必须在ui线程调用");
             _display.Append(line);
 
             if (_display.Length > MaxDisplayChars)
